@@ -76,7 +76,8 @@ func NewAzureIoTHubAuthentication(c config.Config) (Authentication, error) {
 		return nil, errors.New("append ca cert from pem error")
 	}
 	tlsConfig := tls.Config{
-		RootCAs: certpool,
+		RootCAs:       certpool,
+		Renegotiation: tls.RenegotiateOnceAsClient,
 	}
 
 	if conf.TLSCert != "" || conf.TLSKey != "" {
@@ -130,7 +131,7 @@ func NewAzureIoTHubAuthentication(c config.Config) (Authentication, error) {
 
 // Init applies the initial configuration.
 func (a *AzureIoTHubAuthentication) Init(opts *mqtt.ClientOptions) error {
-	broker := fmt.Sprintf("ssl://%s:8883", a.hostname)
+	broker := fmt.Sprintf("wss://%s:443/$iothub/websocket", a.hostname)
 	opts.AddBroker(broker)
 	opts.SetClientID(a.clientID)
 	opts.SetUsername(a.username)
