@@ -123,7 +123,7 @@ func NewAzureIoTHubAuthentication(c config.Config) (Authentication, error) {
 	auth.clientID = conf.DeviceID
 	auth.hostname = conf.Hostname
 	auth.tlsConfig = &tlsConfig
-	auth.username = fmt.Sprintf("%s/%s", conf.Hostname, conf.DeviceID)
+	auth.username = fmt.Sprintf("%s/%s/?api-version=2020-05-31-preview", conf.Hostname, conf.DeviceID)
 
 	return &auth, nil
 }

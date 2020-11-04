@@ -18,6 +18,7 @@ import (
 	"github.com/brocaar/chirpstack-api/go/v3/gw"
 	"github.com/brocaar/chirpstack-gateway-bridge/internal/config"
 	"github.com/brocaar/chirpstack-gateway-bridge/internal/integration/mqtt/auth"
+	"github.com/brocaar/chirpstack-gateway-bridge/internal/integration/mqtt/comm"
 	"github.com/brocaar/lorawan"
 )
 
@@ -27,6 +28,7 @@ type Backend struct {
 
 	auth                          auth.Authentication
 	conn                          paho.Client
+	comm                          comm.Communication
 	closed                        bool
 	clientOpts                    *paho.ClientOptions
 	downlinkFrameChan             chan gw.DownlinkFrame
@@ -81,6 +83,10 @@ func NewBackend(conf config.Config) (*Backend, error) {
 
 		conf.Integration.MQTT.EventTopicTemplate = "devices/{{ .GatewayID }}/messages/events/{{ .EventType }}"
 		conf.Integration.MQTT.CommandTopicTemplate = "devices/{{ .GatewayID }}/messages/devicebound/#"
+		b.comm, err = comm.NewAzureIoTHubCommunication(conf)
+		if err != nil {
+			log.WithError(err).Error("integration/mqtt: new azure iot hub communication error")
+		}
 	default:
 		return nil, fmt.Errorf("integration/mqtt: unknown auth type: %s", conf.Integration.MQTT.Auth.Type)
 	}
@@ -194,6 +200,9 @@ func (b *Backend) SetGatewaySubscription(subscribe bool, gatewayID lorawan.EUI64
 				time.Sleep(time.Second)
 				continue
 			}
+			if b.comm != nil {
+				b.comm.Start(b.handleCommand)
+			}
 
 			b.gateways[gatewayID] = struct{}{}
 		} else {
@@ -203,6 +212,9 @@ func (b *Backend) SetGatewaySubscription(subscribe bool, gatewayID lorawan.EUI64
 				}).Error("integration/mqtt: unsubscribe gateway error")
 				time.Sleep(time.Second)
 				continue
+			}
+			if b.comm != nil {
+				b.comm.Stop()
 			}
 
 			delete(b.gateways, gatewayID)
@@ -224,9 +236,6 @@ func (b *Backend) subscribeGateway(gatewayID lorawan.EUI64) error {
 		"qos":   b.qos,
 	}).Info("integration/mqtt: subscribing to topic")
 
-	if token := b.conn.Subscribe(topic.String(), b.qos, b.handleCommand); token.Wait() && token.Error() != nil {
-		return errors.Wrap(token.Error(), "subscribe topic error")
-	}
 	return nil
 }
 
@@ -272,6 +281,10 @@ func (b *Backend) connect() error {
 	b.conn = paho.NewClient(b.clientOpts)
 	if token := b.conn.Connect(); token.Wait() && token.Error() != nil {
 		return token.Error()
+	}
+
+	if b.comm != nil {
+		b.comm.Init(b.conn)
 	}
 
 	return nil
@@ -339,6 +352,10 @@ func (b *Backend) onConnected(c paho.Client) {
 
 			break
 		}
+	}
+
+	if b.comm != nil {
+		b.comm.Start(b.handleCommand)
 	}
 }
 
