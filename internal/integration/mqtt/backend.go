@@ -18,12 +18,14 @@ import (
 	"github.com/brocaar/chirpstack-api/go/v3/gw"
 	"github.com/brocaar/chirpstack-gateway-bridge/internal/config"
 	"github.com/brocaar/chirpstack-gateway-bridge/internal/integration/mqtt/auth"
+	"github.com/brocaar/chirpstack-gateway-bridge/internal/integration/mqtt/comm"
 	"github.com/brocaar/lorawan"
 )
 
 // Backend implements a MQTT backend.
 type Backend struct {
 	auth auth.Authentication
+	comm comm.Communication
 
 	conn       paho.Client
 	connMux    sync.RWMutex
@@ -90,6 +92,10 @@ func NewBackend(conf config.Config) (*Backend, error) {
 		conf.Integration.MQTT.EventTopicTemplate = "devices/{{ .GatewayID }}/messages/events/{{ .EventType }}"
 		conf.Integration.MQTT.CommandTopicTemplate = "devices/{{ .GatewayID }}/messages/devicebound/#"
 		conf.Integration.MQTT.StateTopicTemplate = ""
+		b.comm, err = comm.NewAzureIoTHubCommunication(conf)
+		if err != nil {
+			log.WithError(err).Error("integration/mqtt: new azure iot hub communication error")
+		}
 	default:
 		return nil, fmt.Errorf("integration/mqtt: unknown auth type: %s", conf.Integration.MQTT.Auth.Type)
 	}
@@ -196,6 +202,11 @@ func (b *Backend) Start() error {
 	b.connectLoop()
 	go b.reconnectLoop()
 	go b.subscribeLoop()
+
+	if b.comm != nil {
+		b.comm.Start(b.handleCommand)
+	}
+
 	return nil
 }
 
@@ -220,6 +231,11 @@ func (b *Backend) Stop() error {
 
 	b.conn.Disconnect(250)
 	b.connClosed = true
+
+	if b.comm != nil {
+		b.comm.Stop()
+	}
+
 	return nil
 }
 
@@ -385,6 +401,10 @@ func (b *Backend) connect() error {
 	b.conn = paho.NewClient(b.clientOpts)
 	if token := b.conn.Connect(); token.WaitTimeout(b.maxTokenWait) && token.Error() != nil {
 		return token.Error()
+	}
+
+	if b.comm != nil {
+		b.comm.Init(b.conn)
 	}
 
 	return nil
