@@ -11,6 +11,7 @@ import (
 
 	mqtt "github.com/eclipse/paho.mqtt.golang"
 	"github.com/gofrs/uuid"
+	"github.com/mitchellh/mapstructure"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 
@@ -38,7 +39,9 @@ type DesiredProperties struct {
 
 // ReportedProperties represents the Azure Digital Twin reported properties.
 type ReportedProperties struct {
-	SerialNumber string `json:"serialNumber"`
+	Make         string `json:"make,omitempty" mapstructure:"make"`
+	Model        string `json:"model,omitempty" mapstructure:"model"`
+	SerialNumber string `json:"serialNumber,omitempty" mapstructure:"serial_number"`
 }
 
 // DigitalTwin represents the Azure Digital Twin.
@@ -63,21 +66,23 @@ type AzureIoTHubCommunication struct {
 
 // NewAzureIoTHubCommunication creates an AzureIoTHubCommunication.
 func NewAzureIoTHubCommunication(conf config.Config) (Communication, error) {
-	handler := AzureIoTHubCommunication{
+	a := AzureIoTHubCommunication{
 		qos:      conf.Integration.MQTT.Auth.Generic.QOS,
 		deviceID: conf.Integration.MQTT.Auth.AzureIoTHub.DeviceID,
 	}
+	a.twin.Reported.SerialNumber = a.deviceID
+	mapstructure.Decode(conf.MetaData.Static, &a.twin.Reported)
 
 	commandTopicTemplate, err := template.New("event").Parse(conf.Integration.MQTT.CommandTopicTemplate)
 	if err != nil {
 		return nil, errors.Wrap(err, "mqtt/comm: parse event-topic template error")
 	}
 	topic := bytes.NewBuffer(nil)
-	if err := commandTopicTemplate.Execute(topic, struct{ GatewayID string }{handler.deviceID}); err != nil {
+	if err := commandTopicTemplate.Execute(topic, struct{ GatewayID string }{a.deviceID}); err != nil {
 		return nil, errors.Wrap(err, "mqtt/comm: execute command topic template error")
 	}
-	handler.commandTopic = topic.String()
-	return &handler, nil
+	a.commandTopic = topic.String()
+	return &a, nil
 }
 
 // Init sets the connection information.
@@ -140,9 +145,7 @@ func (a *AzureIoTHubCommunication) publish(msg message) error {
 		payload = nil
 	case patchProperties:
 		topic = fmt.Sprintf(twinPatchPropertiesTopic, requestID)
-		payload, err = json.Marshal(ReportedProperties{
-			SerialNumber: a.deviceID,
-		})
+		payload, err = json.Marshal(a.twin.Reported)
 		if err != nil {
 			return err
 		}
@@ -176,14 +179,18 @@ func (a *AzureIoTHubCommunication) handleMessage(c mqtt.Client, msg mqtt.Message
 	params, _ := url.ParseQuery(topic.RawQuery)
 
 	if params["$rid"][0] == a.getRequestID && statusCode == 200 {
-		if err := json.Unmarshal(msg.Payload(), &a.twin); err != nil {
+		var receivedTwin DigitalTwin
+		if err := json.Unmarshal(msg.Payload(), &receivedTwin); err != nil {
 			log.WithError(err).Error("mqtt/comm: error unmarshalling payload")
 		}
 		log.WithFields(log.Fields{
-			"twin": a.twin,
+			"twin": receivedTwin,
 		}).Info("mqtt/comm: digital twin received")
-		if a.twin.Reported.SerialNumber != a.deviceID {
-			a.publish(patchProperties)
+		a.twin.Desired = receivedTwin.Desired
+		if receivedTwin.Reported != a.twin.Reported {
+			if err := a.publish(patchProperties); err != nil {
+				log.WithError(err).Error("mqtt/comm: error publishing properties")
+			}
 		}
 	}
 	if statusCode >= 400 {
