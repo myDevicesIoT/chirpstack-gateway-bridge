@@ -201,7 +201,7 @@ func (b *Backend) SetGatewaySubscription(subscribe bool, gatewayID lorawan.EUI64
 				continue
 			}
 			if b.comm != nil {
-				b.comm.Start(b.handleCommand)
+				b.comm.Start()
 			}
 
 			b.gateways[gatewayID] = struct{}{}
@@ -265,6 +265,9 @@ func (b *Backend) PublishEvent(gatewayID lorawan.EUI64, event string, id uuid.UU
 		"exec":  "exec_",
 		"raw":   "raw_",
 	}
+	if b.comm != nil {
+		b.comm.PublishEvent(event, v)
+	}
 	return b.publish(gatewayID, event, log.Fields{
 		idPrefix[event] + "id": id,
 	}, v)
@@ -284,7 +287,7 @@ func (b *Backend) connect() error {
 	}
 
 	if b.comm != nil {
-		b.comm.Init(b.conn)
+		b.comm.Init(b.conn, b.handleCommand, b.handleGatewayCommandExecRequest)
 	}
 
 	return nil
@@ -355,7 +358,7 @@ func (b *Backend) onConnected(c paho.Client) {
 	}
 
 	if b.comm != nil {
-		b.comm.Start(b.handleCommand)
+		b.comm.Start()
 	}
 }
 

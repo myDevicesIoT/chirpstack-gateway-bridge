@@ -11,25 +11,22 @@ import (
 
 	mqtt "github.com/eclipse/paho.mqtt.golang"
 	"github.com/gofrs/uuid"
+	"github.com/golang/protobuf/proto"
 	"github.com/mitchellh/mapstructure"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 
+	"github.com/brocaar/chirpstack-api/go/v3/gw"
 	"github.com/brocaar/chirpstack-gateway-bridge/internal/config"
-)
-
-type message int
-
-const (
-	getTwin message = iota
-	patchProperties
 )
 
 const (
 	twinResTopic = "$iothub/twin/res/#"
+	methodsTopic = "$iothub/methods/POST/#"
 
 	twinGetTopic             = "$iothub/twin/GET/?$rid=%s"
 	twinPatchPropertiesTopic = "$iothub/twin/PATCH/properties/reported/?$rid=%s"
+	methodsResponseTopic     = "$iothub/methods/res/%d/?$rid=%s"
 )
 
 // DesiredProperties represents the Azure Digital Twin desired properties.
@@ -56,12 +53,16 @@ func (dt DigitalTwin) String() string {
 
 // AzureIoTHubCommunication implements the Azure IoT Hub communication.
 type AzureIoTHubCommunication struct {
-	conn         mqtt.Client
-	qos          uint8
-	deviceID     string
-	commandTopic string
-	getRequestID string
-	twin         DigitalTwin
+	conn            mqtt.Client
+	qos             uint8
+	deviceID        string
+	commandTopic    string
+	twinRequestID   string
+	commandID       string
+	twin            DigitalTwin
+	commandChan     chan<- gw.GatewayCommandExecRequest
+	fallbackHandler mqtt.MessageHandler
+	commandHandler  mqtt.MessageHandler
 }
 
 // NewAzureIoTHubCommunication creates an AzureIoTHubCommunication.
@@ -86,16 +87,27 @@ func NewAzureIoTHubCommunication(conf config.Config) (Communication, error) {
 }
 
 // Init sets the connection information.
-func (a *AzureIoTHubCommunication) Init(c mqtt.Client) error {
+func (a *AzureIoTHubCommunication) Init(c mqtt.Client, fallbackHandler mqtt.MessageHandler, commandHandler mqtt.MessageHandler) error {
 	a.conn = c
+	a.fallbackHandler = fallbackHandler
+	a.commandHandler = commandHandler
 	return nil
 }
 
 // Start begins the Azure IoT Hub communication.
-func (a *AzureIoTHubCommunication) Start(fallbackHandler mqtt.MessageHandler) error {
-	a.subscribe(a.commandTopic, fallbackHandler)
+func (a *AzureIoTHubCommunication) Start() error {
+	a.subscribe(a.commandTopic, a.fallbackHandler)
 	a.subscribe(twinResTopic, a.handleMessage)
-	a.publish(getTwin)
+	a.subscribe(methodsTopic, a.handleCommand)
+	a.publishGetTwin()
+	return nil
+}
+
+// PublishEvent publishes event to Azure IoT Hub.
+func (a *AzureIoTHubCommunication) PublishEvent(event string, msg proto.Message) error {
+	if event == "exec" {
+		return a.publishMethodsResponse(msg)
+	}
 	return nil
 }
 
@@ -103,6 +115,7 @@ func (a *AzureIoTHubCommunication) Start(fallbackHandler mqtt.MessageHandler) er
 func (a *AzureIoTHubCommunication) Stop() error {
 	a.unsubscribe(a.commandTopic)
 	a.unsubscribe(twinResTopic)
+	a.unsubscribe(methodsTopic)
 	return nil
 }
 
@@ -128,30 +141,15 @@ func (a *AzureIoTHubCommunication) unsubscribe(topic string) error {
 	return nil
 }
 
-func (a *AzureIoTHubCommunication) publish(msg message) error {
+func (a *AzureIoTHubCommunication) newRequestID() string {
 	requestID, err := uuid.NewV4()
 	if err != nil {
-		log.WithError(err).WithFields(log.Fields{
-			"requestID": requestID,
-		}).Error("mqtt/comm: get random request id error")
-		return err
+		return "1"
 	}
-	var topic string
-	var payload []byte
-	switch msg {
-	case getTwin:
-		a.getRequestID = requestID.String()
-		topic = fmt.Sprintf(twinGetTopic, requestID)
-		payload = nil
-	case patchProperties:
-		topic = fmt.Sprintf(twinPatchPropertiesTopic, requestID)
-		payload, err = json.Marshal(a.twin.Reported)
-		if err != nil {
-			return err
-		}
-	default:
-		return errors.New("mqtt/comm: cannot publish unknown message type")
-	}
+	return requestID.String()
+}
+
+func (a *AzureIoTHubCommunication) publish(topic string, payload []byte) error {
 	log.WithFields(log.Fields{
 		"topic":   topic,
 		"payload": string(payload),
@@ -160,6 +158,45 @@ func (a *AzureIoTHubCommunication) publish(msg message) error {
 		return token.Error()
 	}
 	return nil
+}
+
+func (a *AzureIoTHubCommunication) publishGetTwin() error {
+	a.twinRequestID = a.newRequestID()
+	topic := fmt.Sprintf(twinGetTopic, a.twinRequestID)
+	return a.publish(topic, nil)
+}
+
+func (a *AzureIoTHubCommunication) publishPatchProperties() error {
+	topic := fmt.Sprintf(twinPatchPropertiesTopic, a.newRequestID())
+	payload, err := json.Marshal(a.twin.Reported)
+	if err != nil {
+		return err
+	}
+	return a.publish(topic, payload)
+}
+
+func (a *AzureIoTHubCommunication) publishMethodsResponse(msg proto.Message) error {
+	statusCode := 200
+	response := msg.String()
+	if strings.Contains(response, "error") {
+		statusCode = 500
+	}
+	topic := fmt.Sprintf(methodsResponseTopic, statusCode, a.commandID)
+	payload, err := json.Marshal(map[string]string{
+		"response": response,
+	})
+	if err != nil {
+		return err
+	}
+	return a.publish(topic, payload)
+}
+
+func (a *AzureIoTHubCommunication) parseTopic(msg mqtt.Message) (url.Values, error) {
+	topic, err := url.Parse(msg.Topic())
+	if err != nil {
+		log.WithError(err).Error("mqtt/comm: parse error")
+	}
+	return url.ParseQuery(topic.RawQuery)
 }
 
 func (a *AzureIoTHubCommunication) handleMessage(c mqtt.Client, msg mqtt.Message) {
@@ -172,13 +209,9 @@ func (a *AzureIoTHubCommunication) handleMessage(c mqtt.Client, msg mqtt.Message
 	log.WithFields(log.Fields{
 		"statusCode": statusCode,
 	}).Debug("mqtt/comm: incoming message status")
-	topic, err := url.Parse(msg.Topic())
-	if err != nil {
-		log.WithError(err).Error("mqtt/comm: parse error")
-	}
-	params, _ := url.ParseQuery(topic.RawQuery)
+	params, _ := a.parseTopic(msg)
 
-	if params["$rid"][0] == a.getRequestID && statusCode == 200 {
+	if params["$rid"][0] == a.twinRequestID && statusCode == 200 {
 		var receivedTwin DigitalTwin
 		if err := json.Unmarshal(msg.Payload(), &receivedTwin); err != nil {
 			log.WithError(err).Error("mqtt/comm: error unmarshalling payload")
@@ -188,7 +221,7 @@ func (a *AzureIoTHubCommunication) handleMessage(c mqtt.Client, msg mqtt.Message
 		}).Info("mqtt/comm: digital twin received")
 		a.twin.Desired = receivedTwin.Desired
 		if receivedTwin.Reported != a.twin.Reported {
-			if err := a.publish(patchProperties); err != nil {
+			if err := a.publishPatchProperties(); err != nil {
 				log.WithError(err).Error("mqtt/comm: error publishing properties")
 			}
 		}
@@ -196,4 +229,14 @@ func (a *AzureIoTHubCommunication) handleMessage(c mqtt.Client, msg mqtt.Message
 	if statusCode >= 400 {
 		log.WithField("statusCode", statusCode).Error("mqtt/comm: error with request")
 	}
+}
+
+func (a *AzureIoTHubCommunication) handleCommand(c mqtt.Client, msg mqtt.Message) {
+	log.WithFields(log.Fields{
+		"topic":   msg.Topic(),
+		"payload": string(msg.Payload()),
+	}).Info("mqtt/comm: command received")
+	params, _ := a.parseTopic(msg)
+	a.commandID = params["$rid"][0]
+	a.commandHandler(c, msg)
 }
