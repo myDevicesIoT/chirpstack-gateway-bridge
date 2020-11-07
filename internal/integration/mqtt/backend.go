@@ -204,7 +204,7 @@ func (b *Backend) Start() error {
 	go b.subscribeLoop()
 
 	if b.comm != nil {
-		b.comm.Start(b.handleCommand)
+		b.comm.Start()
 	}
 
 	return nil
@@ -348,6 +348,9 @@ func (b *Backend) PublishEvent(gatewayID lorawan.EUI64, event string, id uuid.UU
 		"exec":  "exec_",
 		"raw":   "raw_",
 	}
+	if b.comm != nil {
+		b.comm.PublishEvent(event, v)
+	}
 	return b.publishEvent(gatewayID, event, log.Fields{
 		idPrefix[event] + "id": id,
 	}, v)
@@ -404,7 +407,7 @@ func (b *Backend) connect() error {
 	}
 
 	if b.comm != nil {
-		b.comm.Init(b.conn)
+		b.comm.Init(b.conn, b.handleCommand, b.handleGatewayCommandExecRequest)
 	}
 
 	return nil
