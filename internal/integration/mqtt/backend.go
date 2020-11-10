@@ -61,6 +61,7 @@ func NewBackend(conf config.Config) (*Backend, error) {
 		gateways:                      make(map[lorawan.EUI64]struct{}),
 	}
 
+	b.comm = comm.StubCommunication{}
 	switch conf.Integration.MQTT.Auth.Type {
 	case "generic":
 		b.auth, err = auth.NewGenericAuthentication(conf)
@@ -200,9 +201,7 @@ func (b *Backend) SetGatewaySubscription(subscribe bool, gatewayID lorawan.EUI64
 				time.Sleep(time.Second)
 				continue
 			}
-			if b.comm != nil {
-				b.comm.Start()
-			}
+			b.comm.Start()
 
 			b.gateways[gatewayID] = struct{}{}
 		} else {
@@ -213,9 +212,7 @@ func (b *Backend) SetGatewaySubscription(subscribe bool, gatewayID lorawan.EUI64
 				time.Sleep(time.Second)
 				continue
 			}
-			if b.comm != nil {
-				b.comm.Stop()
-			}
+			b.comm.Stop()
 
 			delete(b.gateways, gatewayID)
 		}
@@ -265,9 +262,7 @@ func (b *Backend) PublishEvent(gatewayID lorawan.EUI64, event string, id uuid.UU
 		"exec":  "exec_",
 		"raw":   "raw_",
 	}
-	if b.comm != nil {
-		b.comm.PublishEvent(event, v)
-	}
+	b.comm.PublishEvent(event, v)
 	return b.publish(gatewayID, event, log.Fields{
 		idPrefix[event] + "id": id,
 	}, v)
@@ -286,9 +281,7 @@ func (b *Backend) connect() error {
 		return token.Error()
 	}
 
-	if b.comm != nil {
-		b.comm.Init(b.conn, b.handleCommand, b.handleGatewayCommandExecRequest)
-	}
+	b.comm.Init(b.conn, b.handleCommand, b.handleGatewayCommandExecRequest)
 
 	return nil
 }
@@ -357,9 +350,7 @@ func (b *Backend) onConnected(c paho.Client) {
 		}
 	}
 
-	if b.comm != nil {
-		b.comm.Start()
-	}
+	b.comm.Start()
 }
 
 func (b *Backend) onConnectionLost(c paho.Client, err error) {
