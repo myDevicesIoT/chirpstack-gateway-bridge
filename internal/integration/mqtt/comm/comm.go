@@ -1,6 +1,7 @@
 package comm
 
 import (
+	"github.com/brocaar/chirpstack-api/go/v3/gw"
 	mqtt "github.com/eclipse/paho.mqtt.golang"
 	"github.com/golang/protobuf/proto"
 )
@@ -8,7 +9,7 @@ import (
 // Communication defines the communication interface.
 type Communication interface {
 	// Init sets the connection information.
-	Init(c mqtt.Client, fallbackHandler mqtt.MessageHandler, commandHandler mqtt.MessageHandler) error
+	Init(c mqtt.Client, fallbackHandler mqtt.MessageHandler, commandChan chan<- gw.GatewayCommandExecRequest) error
 
 	// Start begins communication with the server.
 	Start() error
@@ -25,7 +26,7 @@ type StubCommunication struct {
 }
 
 // Init does nothing.
-func (StubCommunication) Init(c mqtt.Client, fallbackHandler mqtt.MessageHandler, commandHandler mqtt.MessageHandler) error {
+func (StubCommunication) Init(c mqtt.Client, fallbackHandler mqtt.MessageHandler, commandChan chan<- gw.GatewayCommandExecRequest) error {
 	return nil
 }
 

@@ -281,7 +281,7 @@ func (b *Backend) connect() error {
 		return token.Error()
 	}
 
-	b.comm.Init(b.conn, b.handleCommand, b.handleGatewayCommandExecRequest)
+	b.comm.Init(b.conn, b.handleCommand, b.GetGatewayCommandExecRequestChan())
 
 	return nil
 }

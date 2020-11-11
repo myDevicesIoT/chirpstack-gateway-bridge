@@ -2,6 +2,7 @@ package comm
 
 import (
 	"bytes"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"net/url"
@@ -62,7 +63,6 @@ type AzureIoTHubCommunication struct {
 	twin            DigitalTwin
 	commandChan     chan<- gw.GatewayCommandExecRequest
 	fallbackHandler mqtt.MessageHandler
-	commandHandler  mqtt.MessageHandler
 }
 
 // NewAzureIoTHubCommunication creates an AzureIoTHubCommunication.
@@ -87,10 +87,10 @@ func NewAzureIoTHubCommunication(conf config.Config) (Communication, error) {
 }
 
 // Init sets the connection information.
-func (a *AzureIoTHubCommunication) Init(c mqtt.Client, fallbackHandler mqtt.MessageHandler, commandHandler mqtt.MessageHandler) error {
+func (a *AzureIoTHubCommunication) Init(c mqtt.Client, fallbackHandler mqtt.MessageHandler, commandChan chan<- gw.GatewayCommandExecRequest) error {
 	a.conn = c
 	a.fallbackHandler = fallbackHandler
-	a.commandHandler = commandHandler
+	a.commandChan = commandChan
 	return nil
 }
 
@@ -236,7 +236,21 @@ func (a *AzureIoTHubCommunication) handleCommand(c mqtt.Client, msg mqtt.Message
 		"topic":   msg.Topic(),
 		"payload": string(msg.Payload()),
 	}).Info("mqtt/comm: command received")
+
+	parts := strings.SplitN(msg.Topic(), "/", 5)
 	params, _ := a.parseTopic(msg)
 	a.commandID = params["$rid"][0]
-	a.commandHandler(c, msg)
+
+	var gatewayCommandExecRequest gw.GatewayCommandExecRequest
+	if err := json.Unmarshal(msg.Payload(), &gatewayCommandExecRequest); err != nil {
+		log.WithFields(log.Fields{
+			"topic": msg.Topic(),
+		}).WithError(err).Error("mqtt/comm: unmarshal gateway command execution request error")
+		return
+	}
+	gatewayCommandExecRequest.GatewayId, _ = hex.DecodeString(a.deviceID)
+	gatewayCommandExecRequest.Command = parts[3]
+	gatewayCommandExecRequest.ExecId = []byte(params["$rid"][0])
+
+	a.commandChan <- gatewayCommandExecRequest
 }
