@@ -370,6 +370,8 @@ marshaler="{{ .Integration.Marshaler }}"
     tls_cert="{{ .Integration.MQTT.Auth.AzureIoTHub.TLSCert }}"
     tls_key="{{ .Integration.MQTT.Auth.AzureIoTHub.TLSKey }}"
 
+    # Model ID for Plug and Play devices.
+    model_id="{{ .Integration.MQTT.Auth.AzureIoTHub.ModelID }}"
 
 # Metrics configuration.
 [metrics]

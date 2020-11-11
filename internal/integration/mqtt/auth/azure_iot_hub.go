@@ -13,6 +13,7 @@ import (
 
 	mqtt "github.com/eclipse/paho.mqtt.golang"
 	"github.com/pkg/errors"
+	log "github.com/sirupsen/logrus"
 
 	"github.com/brocaar/chirpstack-gateway-bridge/internal/config"
 )
@@ -123,7 +124,14 @@ func NewAzureIoTHubAuthentication(c config.Config) (Authentication, error) {
 	auth.clientID = conf.DeviceID
 	auth.hostname = conf.Hostname
 	auth.tlsConfig = &tlsConfig
-	auth.username = fmt.Sprintf("%s/%s/?api-version=2020-05-31-preview", conf.Hostname, conf.DeviceID)
+	auth.username = fmt.Sprintf("%s/%s/?api-version=2020-09-30", conf.Hostname, conf.DeviceID)
+	if conf.ModelID != "" {
+		auth.username = fmt.Sprintf("%s&model-id=%s", auth.username, conf.ModelID)
+	}
+	log.WithFields(log.Fields{
+		"username": auth.username,
+		"model_id": conf.ModelID,
+	}).Debug("new azure authentication")
 
 	return &auth, nil
 }
