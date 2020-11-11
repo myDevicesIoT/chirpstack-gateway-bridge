@@ -61,8 +61,8 @@ type AzureIoTHubCommunication struct {
 	twinRequestID   string
 	commandID       string
 	twin            DigitalTwin
-	commandChan     chan<- gw.GatewayCommandExecRequest
 	fallbackHandler mqtt.MessageHandler
+	commandHandler  func(gw.GatewayCommandExecRequest)
 }
 
 // NewAzureIoTHubCommunication creates an AzureIoTHubCommunication.
@@ -87,10 +87,10 @@ func NewAzureIoTHubCommunication(conf config.Config) (Communication, error) {
 }
 
 // Init sets the connection information.
-func (a *AzureIoTHubCommunication) Init(c mqtt.Client, fallbackHandler mqtt.MessageHandler, commandChan chan<- gw.GatewayCommandExecRequest) error {
+func (a *AzureIoTHubCommunication) Init(c mqtt.Client, fallbackHandler mqtt.MessageHandler, commandHandler func(gw.GatewayCommandExecRequest)) error {
 	a.conn = c
 	a.fallbackHandler = fallbackHandler
-	a.commandChan = commandChan
+	a.commandHandler = commandHandler
 	return nil
 }
 
@@ -252,5 +252,5 @@ func (a *AzureIoTHubCommunication) handleCommand(c mqtt.Client, msg mqtt.Message
 	gatewayCommandExecRequest.Command = parts[3]
 	gatewayCommandExecRequest.ExecId = []byte(params["$rid"][0])
 
-	a.commandChan <- gatewayCommandExecRequest
+	a.commandHandler(gatewayCommandExecRequest)
 }

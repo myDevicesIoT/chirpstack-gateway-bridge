@@ -68,7 +68,6 @@ func NewBackend(conf config.Config) (*Backend, error) {
 		maxTokenWait:            conf.Integration.MQTT.MaxTokenWait,
 	}
 
-	b.comm = comm.StubCommunication{}
 	switch conf.Integration.MQTT.Auth.Type {
 	case "generic":
 		b.auth, err = auth.NewGenericAuthentication(conf)
@@ -204,7 +203,9 @@ func (b *Backend) Start() error {
 	go b.reconnectLoop()
 	go b.subscribeLoop()
 
-	b.comm.Start()
+	if b.comm != nil {
+		b.comm.Start()
+	}
 
 	return nil
 }
@@ -230,8 +231,9 @@ func (b *Backend) Stop() error {
 
 	b.conn.Disconnect(250)
 	b.connClosed = true
-
-	b.comm.Stop()
+	if b.comm != nil {
+		b.comm.Stop()
+	}
 
 	return nil
 }
@@ -345,7 +347,9 @@ func (b *Backend) PublishEvent(gatewayID lorawan.EUI64, event string, id uuid.UU
 		"exec":  "exec_",
 		"raw":   "raw_",
 	}
-	b.comm.PublishEvent(event, v)
+	if b.comm != nil {
+		b.comm.PublishEvent(event, v)
+	}
 	return b.publishEvent(gatewayID, event, log.Fields{
 		idPrefix[event] + "id": id,
 	}, v)
@@ -401,7 +405,9 @@ func (b *Backend) connect() error {
 		return token.Error()
 	}
 
-	b.comm.Init(b.conn, b.handleCommand, b.GetGatewayCommandExecRequestChan())
+	if b.comm != nil {
+		b.comm.Init(b.conn, b.handleCommand, b.gatewayCommandExecRequestFunc)
+	}
 
 	return nil
 }
