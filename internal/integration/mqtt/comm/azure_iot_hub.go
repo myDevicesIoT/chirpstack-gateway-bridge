@@ -37,9 +37,8 @@ type DesiredProperties struct {
 
 // ReportedProperties represents the Azure Digital Twin reported properties.
 type ReportedProperties struct {
-	Make         string `json:"make,omitempty" mapstructure:"make"`
-	Model        string `json:"model,omitempty" mapstructure:"model"`
-	SerialNumber string `json:"serialNumber,omitempty" mapstructure:"serial_number"`
+	Make  string `json:"make,omitempty" mapstructure:"make"`
+	Model string `json:"model,omitempty" mapstructure:"model"`
 }
 
 // DigitalTwin represents the Azure Digital Twin.
@@ -71,7 +70,6 @@ func NewAzureIoTHubCommunication(conf config.Config) (Communication, error) {
 		qos:      conf.Integration.MQTT.Auth.Generic.QOS,
 		deviceID: conf.Integration.MQTT.Auth.AzureIoTHub.DeviceID,
 	}
-	a.twin.Reported.SerialNumber = a.deviceID
 	mapstructure.Decode(conf.MetaData.Static, &a.twin.Reported)
 
 	commandTopicTemplate, err := template.New("event").Parse(conf.Integration.MQTT.CommandTopicTemplate)
