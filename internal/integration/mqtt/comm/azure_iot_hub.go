@@ -233,9 +233,11 @@ func (a *AzureIoTHubCommunication) handleMessage(c mqtt.Client, msg mqtt.Message
 
 func (a *AzureIoTHubCommunication) handleCommand(c mqtt.Client, msg mqtt.Message) {
 	log.WithFields(log.Fields{
-		"topic":   msg.Topic(),
-		"payload": string(msg.Payload()),
+		"topic": msg.Topic(),
 	}).Info("mqtt/comm: command received")
+	log.WithFields(log.Fields{
+		"payload": string(msg.Payload()),
+	}).Debug("mqtt/comm: command payload")
 
 	parts := strings.SplitN(msg.Topic(), "/", 5)
 	params, _ := a.parseTopic(msg)
