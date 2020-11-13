@@ -151,6 +151,9 @@ func (b *Backend) Close() error {
 	b.Lock()
 	b.closed = true
 	b.Unlock()
+	if b.comm != nil {
+		b.comm.Stop()
+	}
 
 	b.conn.Disconnect(250)
 	return nil
@@ -200,9 +203,6 @@ func (b *Backend) SetGatewaySubscription(subscribe bool, gatewayID lorawan.EUI64
 				time.Sleep(time.Second)
 				continue
 			}
-			if b.comm != nil {
-				b.comm.Start()
-			}
 
 			b.gateways[gatewayID] = struct{}{}
 		} else {
@@ -212,9 +212,6 @@ func (b *Backend) SetGatewaySubscription(subscribe bool, gatewayID lorawan.EUI64
 				}).Error("integration/mqtt: unsubscribe gateway error")
 				time.Sleep(time.Second)
 				continue
-			}
-			if b.comm != nil {
-				b.comm.Stop()
 			}
 
 			delete(b.gateways, gatewayID)

@@ -99,7 +99,7 @@ func (a *AzureIoTHubCommunication) Init(c mqtt.Client, fallbackHandler mqtt.Mess
 
 // Start begins the Azure IoT Hub communication.
 func (a *AzureIoTHubCommunication) Start() error {
-	a.subscribe(a.commandTopic, a.fallbackHandler)
+	// a.subscribe(a.commandTopic, a.fallbackHandler)
 	a.subscribe(twinResTopic, a.handleMessage)
 	a.subscribe(methodsTopic, a.handleCommand)
 	a.publishGetTwin()
@@ -119,7 +119,7 @@ func (a *AzureIoTHubCommunication) PublishEvent(event string, msg proto.Message)
 
 // Stop ends the Azure IoT Hub communication.
 func (a *AzureIoTHubCommunication) Stop() error {
-	a.unsubscribe(a.commandTopic)
+	// a.unsubscribe(a.commandTopic)
 	a.unsubscribe(twinResTopic)
 	a.unsubscribe(methodsTopic)
 	return nil
