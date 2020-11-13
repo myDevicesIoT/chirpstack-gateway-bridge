@@ -30,6 +30,11 @@ const (
 	methodsResponseTopic     = "$iothub/methods/res/%d/?$rid=%s"
 )
 
+// Stats defines the stats interface.
+type Stats interface {
+	GetMetaData() map[string]string
+}
+
 // DesiredProperties represents the Azure Digital Twin desired properties.
 type DesiredProperties struct {
 	Version int `json:"$version"`
@@ -103,8 +108,11 @@ func (a *AzureIoTHubCommunication) Start() error {
 
 // PublishEvent publishes event to Azure IoT Hub.
 func (a *AzureIoTHubCommunication) PublishEvent(event string, msg proto.Message) error {
-	if event == "exec" {
+	switch event {
+	case "exec":
 		return a.publishMethodsResponse(msg)
+	case "stats":
+		return a.publishStats(msg.(Stats))
 	}
 	return nil
 }
@@ -187,6 +195,27 @@ func (a *AzureIoTHubCommunication) publishMethodsResponse(msg proto.Message) err
 		return err
 	}
 	return a.publish(topic, payload)
+}
+
+func (a *AzureIoTHubCommunication) publishStats(stats Stats) error {
+	metaData := stats.GetMetaData()
+	log.WithField("meta_data", metaData).Debug("mqtt/comm: publish stats")
+	if len(metaData) == 0 {
+		return nil
+	}
+	var properties ReportedProperties
+	if err := mapstructure.Decode(metaData, &properties); err != nil {
+		log.WithError(err).Error("mqtt/comm: error decoding stats")
+		return err
+	}
+	if properties != a.twin.Reported {
+		a.twin.Reported = properties
+		if err := a.publishPatchProperties(); err != nil {
+			log.WithError(err).Error("mqtt/comm: error publishing properties")
+			return err
+		}
+	}
+	return nil
 }
 
 func (a *AzureIoTHubCommunication) parseTopic(msg mqtt.Message) (url.Values, error) {
