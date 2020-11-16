@@ -30,11 +30,6 @@ const (
 	methodsResponseTopic     = "$iothub/methods/res/%d/?$rid=%s"
 )
 
-// Stats defines the stats interface.
-type Stats interface {
-	GetMetaData() map[string]string
-}
-
 // DesiredProperties represents the Azure Digital Twin desired properties.
 type DesiredProperties struct {
 	Version int `json:"$version"`
@@ -50,6 +45,13 @@ type ReportedProperties struct {
 type DigitalTwin struct {
 	Desired  DesiredProperties  `json:"desired"`
 	Reported ReportedProperties `json:"reported"`
+}
+
+// MethodsResponse represents the response to a direct method call.
+type MethodsResponse struct {
+	Stdout string `json:"stdout,omitempty"`
+	Stderr string `json:"stderr,omitempty"`
+	Error  string `json:"error,omitempty"`
 }
 
 func (dt DigitalTwin) String() string {
@@ -110,9 +112,9 @@ func (a *AzureIoTHubCommunication) Start() error {
 func (a *AzureIoTHubCommunication) PublishEvent(event string, msg proto.Message) error {
 	switch event {
 	case "exec":
-		return a.publishMethodsResponse(msg)
+		return a.publishMethodsResponse(msg.(*gw.GatewayCommandExecResponse))
 	case "stats":
-		return a.publishStats(msg.(Stats))
+		return a.publishStats(msg.(*gw.GatewayStats))
 	}
 	return nil
 }
@@ -181,23 +183,26 @@ func (a *AzureIoTHubCommunication) publishPatchProperties() error {
 	return a.publish(topic, payload)
 }
 
-func (a *AzureIoTHubCommunication) publishMethodsResponse(msg proto.Message) error {
+func (a *AzureIoTHubCommunication) publishMethodsResponse(execResponse *gw.GatewayCommandExecResponse) error {
 	statusCode := 200
-	response := msg.String()
-	if strings.Contains(response, "error") {
+	var response MethodsResponse
+	if err := mapstructure.WeakDecode(execResponse, &response); err != nil {
+		log.WithError(err).Error("mqtt/comm: error decoding exec response")
+		return err
+	}
+	log.WithField("response", response).Debug("mqtt/comm: decoded exec response")
+	if response.Error != "" {
 		statusCode = 500
 	}
 	topic := fmt.Sprintf(methodsResponseTopic, statusCode, a.commandID)
-	payload, err := json.Marshal(map[string]string{
-		"response": response,
-	})
+	payload, err := json.Marshal(response)
 	if err != nil {
 		return err
 	}
 	return a.publish(topic, payload)
 }
 
-func (a *AzureIoTHubCommunication) publishStats(stats Stats) error {
+func (a *AzureIoTHubCommunication) publishStats(stats *gw.GatewayStats) error {
 	metaData := stats.GetMetaData()
 	log.WithField("meta_data", metaData).Debug("mqtt/comm: publish stats")
 	if len(metaData) == 0 {
