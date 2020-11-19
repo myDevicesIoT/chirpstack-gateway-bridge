@@ -233,6 +233,9 @@ func (b *Backend) subscribeGateway(gatewayID lorawan.EUI64) error {
 		"qos":   b.qos,
 	}).Info("integration/mqtt: subscribing to topic")
 
+	if token := b.conn.Subscribe(topic.String(), b.qos, b.handleCommand); token.Wait() && token.Error() != nil {
+		return errors.Wrap(token.Error(), "subscribe topic error")
+	}
 	return nil
 }
 
