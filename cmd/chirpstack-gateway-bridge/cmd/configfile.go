@@ -378,6 +378,12 @@ marshaler="{{ .Integration.Marshaler }}"
     # Model ID for Plug and Play devices.
     model_id="{{ .Integration.MQTT.Auth.AzureIoTHub.ModelID }}"
 
+    # IoT Hub device provisioning endpoint.
+    provisioning_endpoint="{{ .Integration.MQTT.Auth.AzureIoTHub.ProvisioningEndpoint }}"
+
+    # IoT Hub device provisioning scope.
+    provisioning_scope="{{ .Integration.MQTT.Auth.AzureIoTHub.ProvisioningScope }}"
+
 # Metrics configuration.
 [metrics]
 

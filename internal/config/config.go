@@ -97,6 +97,8 @@ type Config struct {
 					TLSCert                string        `mapstructure:"tls_cert"`
 					TLSKey                 string        `mapstructure:"tls_key"`
 					ModelID                string        `mapstructure:"model_id"`
+					ProvisioningEndpoint   string        `mapstructure:"provisioning_endpoint"`
+					ProvisioningScope      string        `mapstructure:"provisioning_scope"`
 				} `mapstructure:"azure_iot_hub"`
 			} `mapstructure:"auth"`
 		} `mapstructure:"mqtt"`

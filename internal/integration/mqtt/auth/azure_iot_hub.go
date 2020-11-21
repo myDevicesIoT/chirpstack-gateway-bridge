@@ -146,6 +146,13 @@ func NewAzureIoTHubAuthentication(c config.Config) (Authentication, error) {
 		at = authTypeX509
 	}
 
+	if provClient, err := NewAzureIoTHubProvisioning(c); err == nil {
+		if conf.Hostname == "" {
+			provClient.ProvisionDevice()
+			conf = config.C.Integration.MQTT.Auth.AzureIoTHub
+		}
+	}
+
 	if at == authTypeSymmetric {
 		if conf.DeviceConnectionString != "" {
 			kvMap, err := parseConnectionString(conf.DeviceConnectionString)

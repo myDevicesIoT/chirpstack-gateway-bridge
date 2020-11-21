@@ -95,6 +95,7 @@ func initConfig() {
 		if err := viper.ReadConfig(bytes.NewBuffer(b)); err != nil {
 			log.WithError(err).WithField("config", cfgFile).Fatal("error loading config file")
 		}
+		viper.SetConfigFile(cfgFile)
 	} else {
 		viper.SetConfigName("chirpstack-gateway-bridge")
 		viper.AddConfigPath(".")
