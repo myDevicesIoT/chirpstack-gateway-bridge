@@ -38,6 +38,7 @@ type ProvisioningClient struct {
 	mqttClient            MQTT.Client
 	httpClient            http.Client
 	opts                  Options
+	mqttOpts              *MQTT.ClientOptions
 	messageChan           chan message
 	registrationStateChan chan RegistrationState
 	requestScheduled      bool
@@ -109,47 +110,47 @@ func NewAzureIoTHubProvisioning(conf config.Config) (*ProvisioningClient, error)
 	}
 	tlsconfig := c.newTLSConfig()
 	if strings.Contains(opts.Protocol, "http") {
-		transport := &http.Transport{TLSClientConfig: c.newTLSConfig()}
+		transport := &http.Transport{TLSClientConfig: tlsconfig}
 		c.httpClient = http.Client{Transport: transport}
 	} else {
-		// if log.GetLevel() == log.TraceLevel {
-		// 	MQTT.DEBUG = logger.New(log.DebugLevel)
-		// 	MQTT.WARN = logger.New(log.WarnLevel)
-		// }
-		// MQTT.CRITICAL = logger.New(log.ErrorLevel)
-		// MQTT.ERROR = logger.New(log.ErrorLevel)
-		mqttOpts := MQTT.NewClientOptions()
+		// MQTT.CRITICAL = log.StandardLogger()
+		// MQTT.ERROR = log.StandardLogger()
+		// MQTT.WARN = log.StandardLogger()
+		// MQTT.DEBUG = log.StandardLogger()
+		c.mqttOpts = MQTT.NewClientOptions()
 		server := fmt.Sprintf("ssl://%s:8883", c.opts.Endpoint)
 		username := fmt.Sprintf("%s/registrations/%s/api-version=2019-03-31", c.opts.Scope, c.opts.RegistrationID)
-		mqttOpts.AddBroker(server)
-		mqttOpts.SetClientID(c.opts.RegistrationID)
-		mqttOpts.SetUsername(username)
-		mqttOpts.SetTLSConfig(tlsconfig)
-		mqttOpts.SetConnectRetry(true)
-		mqttOpts.SetAutoReconnect(true)
-		mqttOpts.SetOnConnectHandler(func(client MQTT.Client) {
+		c.mqttOpts.AddBroker(server)
+		c.mqttOpts.SetClientID(c.opts.RegistrationID)
+		c.mqttOpts.SetUsername(username)
+		c.mqttOpts.SetTLSConfig(tlsconfig)
+		c.mqttOpts.SetConnectRetry(true)
+		c.mqttOpts.SetAutoReconnect(true)
+		c.mqttOpts.SetOnConnectHandler(func(client MQTT.Client) {
 			log.Trace("azure/dps: connected")
+			log.WithField("topic", registrationsResponseTopic).Info("azure/dps: subscribing to topic")
 			go client.Subscribe(registrationsResponseTopic, 1, nil)
 			go c.sendRegisterRequest(0)
 		})
-		mqttOpts.SetConnectionLostHandler(func(client MQTT.Client, err error) {
+		c.mqttOpts.SetConnectionLostHandler(func(client MQTT.Client, err error) {
 			log.Debug("azure/dps: connection lost")
 		})
-		mqttOpts.SetReconnectingHandler(func(client MQTT.Client, opts *MQTT.ClientOptions) {
-			log.Debug("azure/dps: reconnecting")
-		})
-		mqttOpts.SetDefaultPublishHandler(c.messageHandler)
+		// c.mqttOpts.SetReconnectingHandler(func(client MQTT.Client, opts *MQTT.ClientOptions) {
+		// 	log.Debug("azure/dps: reconnecting")
+		// })
+		c.mqttOpts.SetDefaultPublishHandler(c.messageHandler)
 
-		c.mqttClient = MQTT.NewClient(mqttOpts)
+		c.mqttClient = MQTT.NewClient(c.mqttOpts)
 	}
 	return &c, nil
 }
 
 // ProvisionDevice connects to the server and provisions the device.
-func (c *ProvisioningClient) ProvisionDevice() {
+func (c *ProvisioningClient) ProvisionDevice() (*RegistrationState, error) {
 	err := c.connect()
 	if err != nil {
 		log.Fatal("azure/dps: connection error")
+		return nil, err
 	}
 
 	go c.messageLoop()
@@ -158,7 +159,7 @@ func (c *ProvisioningClient) ProvisionDevice() {
 	log.WithFields(log.Fields{
 		"hub":       registrationState.AssignedHub,
 		"device id": registrationState.DeviceID,
-	}).Info("azure/dps: device registered")
+	}).Info("azure/dps: registered device")
 
 	c.writeConfigFile(registrationState)
 
@@ -166,6 +167,7 @@ func (c *ProvisioningClient) ProvisionDevice() {
 		log.Info("azure/dps: disconnecting")
 		c.mqttClient.Disconnect(250)
 	}
+	return &registrationState, nil
 }
 
 func (c *ProvisioningClient) newTLSConfig() *tls.Config {

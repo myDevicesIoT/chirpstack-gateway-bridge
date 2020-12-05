@@ -113,6 +113,8 @@ const (
 	authTypeX509
 )
 
+const provisionInterval = 7 * 24 * time.Hour
+
 // AzureIoTHubAuthentication implements the Azure IoT Hub authentication.
 type AzureIoTHubAuthentication struct {
 	authType authType
@@ -124,10 +126,14 @@ type AzureIoTHubAuthentication struct {
 	sasTokenExpiration time.Duration
 
 	tlsConfig *tls.Config
+
+	modelID    string
+	provClient *ProvisioningClient
+	onChange   func()
 }
 
 // NewAzureIoTHubAuthentication creates an AzureIoTHubAuthentication.
-func NewAzureIoTHubAuthentication(c config.Config) (Authentication, error) {
+func NewAzureIoTHubAuthentication(c config.Config, onChange func()) (Authentication, error) {
 	var auth AzureIoTHubAuthentication
 
 	at := authTypeSymmetric
@@ -146,11 +152,18 @@ func NewAzureIoTHubAuthentication(c config.Config) (Authentication, error) {
 		at = authTypeX509
 	}
 
-	if provClient, err := NewAzureIoTHubProvisioning(c); err == nil {
+	auth.onChange = onChange
+	var err error
+	if auth.provClient, err = NewAzureIoTHubProvisioning(c); err == nil {
+		var delay time.Duration
 		if conf.Hostname == "" {
-			provClient.ProvisionDevice()
-			conf = config.C.Integration.MQTT.Auth.AzureIoTHub
+			registration, err := auth.provClient.ProvisionDevice()
+			if err == nil {
+				conf.Hostname = registration.AssignedHub
+			}
+			delay = provisionInterval
 		}
+		go auth.provisioningLoop(delay)
 	}
 
 	if at == authTypeSymmetric {
@@ -192,14 +205,12 @@ func NewAzureIoTHubAuthentication(c config.Config) (Authentication, error) {
 
 	auth.clientID = conf.DeviceID
 	auth.hostname = conf.Hostname
+	auth.modelID = conf.ModelID
 	auth.tlsConfig = &tlsConfig
-	auth.username = fmt.Sprintf("%s/%s/?api-version=2020-09-30", conf.Hostname, conf.DeviceID)
-	if conf.ModelID != "" {
-		auth.username = fmt.Sprintf("%s&model-id=%s", auth.username, conf.ModelID)
-	}
+	auth.setUsername()
 	log.WithFields(log.Fields{
 		"username": auth.username,
-		"model_id": conf.ModelID,
+		"model_id": auth.modelID,
 	}).Debug("new azure authentication")
 
 	return &auth, nil
@@ -238,6 +249,28 @@ func (a *AzureIoTHubAuthentication) Update(opts *mqtt.ClientOptions) error {
 // Note: return 0 to disable the periodical re-connect feature.
 func (a *AzureIoTHubAuthentication) ReconnectAfter() time.Duration {
 	return a.sasTokenExpiration
+}
+
+func (a *AzureIoTHubAuthentication) setUsername() {
+	a.username = fmt.Sprintf("%s/%s/?api-version=2020-09-30", a.hostname, a.clientID)
+	if a.modelID != "" {
+		a.username = fmt.Sprintf("%s&model-id=%s", a.username, a.modelID)
+	}
+}
+
+func (a *AzureIoTHubAuthentication) provisioningLoop(delay time.Duration) {
+	time.Sleep(delay)
+	for {
+		registration, err := a.provClient.ProvisionDevice()
+		log.Debug("azure/dps: provisioned device")
+		if err == nil && registration.AssignedHub != "" && a.hostname != registration.AssignedHub {
+			log.Debug("azure/dps: hub changed")
+			a.hostname = registration.AssignedHub
+			a.setUsername()
+			a.onChange()
+		}
+		time.Sleep(provisionInterval)
+	}
 }
 
 func createSASToken(uri string, deviceKey []byte, expiration time.Duration) (string, error) {

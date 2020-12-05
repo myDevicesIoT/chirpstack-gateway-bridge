@@ -76,7 +76,17 @@ func NewBackend(conf config.Config) (*Backend, error) {
 		conf.Integration.MQTT.EventTopicTemplate = "/devices/gw-{{ .GatewayID }}/events/{{ .EventType }}"
 		conf.Integration.MQTT.CommandTopicTemplate = "/devices/gw-{{ .GatewayID }}/commands/#"
 	case "azure_iot_hub":
-		b.auth, err = auth.NewAzureIoTHubAuthentication(conf)
+		b.auth, err = auth.NewAzureIoTHubAuthentication(conf, func() {
+			log.Debug("integration/mqtt: re-init")
+			if err := b.auth.Init(b.clientOpts); err != nil {
+				log.Error("integration/mqtt: re-init authentication error")
+			}
+			if b.conn.IsConnectionOpen() {
+				log.Debug("integration/mqtt: reconnecting after re-init")
+				b.disconnect()
+				b.connectLoop()
+			}
+		})
 		if err != nil {
 			return nil, errors.Wrap(err, "integration/mqtt: new azure iot hub authentication error")
 		}
