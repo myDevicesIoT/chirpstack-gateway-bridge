@@ -7,18 +7,18 @@ builds:
   - main: cmd/chirpstack-gateway-bridge/main.go
     binary: chirpstack-gateway-bridge
     goos:
-      - windows
-      - darwin
+      # - windows
+      # - darwin
       - linux
     goarch:
-      - amd64
-      - 386
+      # - amd64
+      # - 386
       - arm
-      - arm64
+      # - arm64
       - mips
     goarm:
       - 5
-      - 6
+      # - 6
       - 7
     ignore:
       - goos: darwin
@@ -29,23 +29,23 @@ builds:
 release:
   disable: true
 
-nfpm:
-  vendor: ChirpStack
-  homepage: https://www.chirpstack.io/
-  maintainer: Orne Brocaar <info@brocaar.com>
-  description: ChirpStack Gateway Bridge
-  license: MIT
-  formats:
-    - deb
-    - rpm
-  bindir: /usr/bin
-  files:
-    "packaging/files/chirpstack-gateway-bridge.rotate": "/etc/logrotate.d/chirpstack-gateway-bridge"
-    "packaging/files/chirpstack-gateway-bridge.init": "/usr/lib/chirpstack-gateway-bridge/scripts/chirpstack-gateway-bridge.init"
-    "packaging/files/chirpstack-gateway-bridge.service": "/usr/lib/chirpstack-gateway-bridge/scripts/chirpstack-gateway-bridge.service"
-  config_files:
-    "packaging/files/chirpstack-gateway-bridge.toml": "/etc/chirpstack-gateway-bridge/chirpstack-gateway-bridge.toml"
-  scripts:
-    preinstall: "packaging/scripts/pre-install.sh"
-    postinstall: "packaging/scripts/post-install.sh"
-    postremove: "packaging/scripts/post-remove.sh"
+# nfpm:
+#   vendor: ChirpStack
+#   homepage: https://www.chirpstack.io/
+#   maintainer: Orne Brocaar <info@brocaar.com>
+#   description: ChirpStack Gateway Bridge
+#   license: MIT
+#   formats:
+#     - deb
+#     - rpm
+#   bindir: /usr/bin
+#   files:
+#     "packaging/files/chirpstack-gateway-bridge.rotate": "/etc/logrotate.d/chirpstack-gateway-bridge"
+#     "packaging/files/chirpstack-gateway-bridge.init": "/usr/lib/chirpstack-gateway-bridge/scripts/chirpstack-gateway-bridge.init"
+#     "packaging/files/chirpstack-gateway-bridge.service": "/usr/lib/chirpstack-gateway-bridge/scripts/chirpstack-gateway-bridge.service"
+#   config_files:
+#     "packaging/files/chirpstack-gateway-bridge.toml": "/etc/chirpstack-gateway-bridge/chirpstack-gateway-bridge.toml"
+#   scripts:
+#     preinstall: "packaging/scripts/pre-install.sh"
+#     postinstall: "packaging/scripts/post-install.sh"
+#     postremove: "packaging/scripts/post-remove.sh"

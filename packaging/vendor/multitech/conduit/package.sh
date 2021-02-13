@@ -1,11 +1,12 @@
-#!/bin/env bash
+#!/bin/bash
 
 PACKAGE_NAME="chirpstack-gateway-bridge"
 PACKAGE_VERSION=$1
 REV="r1"
 
 
-PACKAGE_URL="https://artifacts.chirpstack.io/downloads/chirpstack-gateway-bridge/chirpstack-gateway-bridge_${PACKAGE_VERSION}_linux_armv5.tar.gz"
+# PACKAGE_URL="https://artifacts.chirpstack.io/downloads/chirpstack-gateway-bridge/chirpstack-gateway-bridge_${PACKAGE_VERSION}_linux_armv5.tar.gz"
+PACKAGE_FILE="../../../../dist/chirpstack-gateway-bridge_${PACKAGE_VERSION}_linux_armv5.tar.gz"
 DIR=`dirname $0`
 PACKAGE_DIR="${DIR}/package"
 
@@ -18,7 +19,7 @@ cat > $PACKAGE_DIR/CONTROL/control << EOF
 Package: $PACKAGE_NAME
 Version: $PACKAGE_VERSION-$REV
 Architecture: arm926ejste
-Maintainer: Orne Brocaar <info@brocaar.com>
+Maintainer: myDevices, Inc. <support@mydevices.com>
 Priority: optional
 Section: network
 Source: N/A
@@ -27,21 +28,32 @@ EOF
 
 cat > $PACKAGE_DIR/CONTROL/postinst << EOF
 update-rc.d chirpstack-gateway-bridge defaults
+/etc/init.d/chirpstack-gateway-bridge start
 EOF
 chmod 755 $PACKAGE_DIR/CONTROL/postinst
 
+cat > $PACKAGE_DIR/CONTROL/prerm << EOF
+/etc/init.d/chirpstack-gateway-bridge stop
+EOF
+chmod 755 $PACKAGE_DIR/CONTROL/prerm
+
+cat > $PACKAGE_DIR/CONTROL/postrm << EOF
+update-rc.d chirpstack-gateway-bridge remove
+EOF
+chmod 755 $PACKAGE_DIR/CONTROL/postrm
+
 cat > $PACKAGE_DIR/CONTROL/conffiles << EOF
-/var/config/$PACKAGE_NAME/$PACKAGE_NAME.toml
+/etc/opt/$PACKAGE_NAME/$PACKAGE_NAME.toml
 EOF
 
 # Files
 mkdir -p $PACKAGE_DIR/opt/$PACKAGE_NAME
-mkdir -p $PACKAGE_DIR/var/config/$PACKAGE_NAME
+mkdir -p $PACKAGE_DIR/etc/opt/$PACKAGE_NAME
 mkdir -p $PACKAGE_DIR/etc/init.d
 
-cp files/$PACKAGE_NAME.toml $PACKAGE_DIR/var/config/$PACKAGE_NAME/$PACKAGE_NAME.toml
+cp files/$PACKAGE_NAME.toml $PACKAGE_DIR/etc/opt/$PACKAGE_NAME/$PACKAGE_NAME.toml
 cp files/$PACKAGE_NAME.init $PACKAGE_DIR/etc/init.d/$PACKAGE_NAME
-wget -P $PACKAGE_DIR/opt/$PACKAGE_NAME $PACKAGE_URL
+cp $PACKAGE_FILE $PACKAGE_DIR/opt/$PACKAGE_NAME 
 tar zxf $PACKAGE_DIR/opt/$PACKAGE_NAME/*.tar.gz -C $PACKAGE_DIR/opt/$PACKAGE_NAME
 rm $PACKAGE_DIR/opt/$PACKAGE_NAME/*.tar.gz
 

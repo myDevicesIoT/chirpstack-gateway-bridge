@@ -3,15 +3,22 @@ DESC="ChirpStack Gateway Bridge"
 DAEMON_BIN=/opt/$NAME/$NAME
 DAEMON_CONF=/etc/$NAME
 DAEMON_PID=/var/run/$NAME.pid
+DEVICE_ID=$(mts-io-sysfs show lora/eui | tr -d : | tr '[:upper:]' '[:lower:]')
+CONFIG_FILE=/etc/opt/$NAME/$NAME.toml
 
 function do_start {
     echo "Starting $NAME"
+    if [[ $DEVICE_ID =~ ^[0-9a-f]{16}$ ]]; then
+        sed -i "s|<DEVICE_ID>|$DEVICE_ID|g" $CONFIG_FILE
+        sed -i "s|<TLS_CERT>|/opt/mydevices/$DEVICE_ID.cert.pem|g" $CONFIG_FILE
+        sed -i "s|<TLS_KEY>|/opt/mydevices/$DEVICE_ID.key.pem|g" $CONFIG_FILE
+    fi
 	start-stop-daemon \
         --start \
         --background \
         --make-pidfile \
         --pidfile $DAEMON_PID \
-        --exec $DAEMON_BIN -- --config /var/config/$NAME/$NAME.toml
+        --exec $DAEMON_BIN -- --config $CONFIG_FILE
 }
 
 function do_stop {
