@@ -19,7 +19,7 @@ log_to_syslog=true
       command = "/opt/mydevices/command-ctrl.sh reboot"
       max_execution_duration = "1s"
 
-    [commands.commands.remote_ctrl]
+    [commands.commands.remote-ctrl]
       command = "/opt/mydevices/command-ctrl.sh remote-ctrl"
       max_execution_duration = "15s"
 
