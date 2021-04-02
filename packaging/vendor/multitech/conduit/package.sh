@@ -6,7 +6,7 @@ REV="r1"
 
 
 # PACKAGE_URL="https://artifacts.chirpstack.io/downloads/chirpstack-gateway-bridge/chirpstack-gateway-bridge_${PACKAGE_VERSION}_linux_armv5.tar.gz"
-PACKAGE_FILE="../../../../dist/chirpstack-gateway-bridge_${PACKAGE_VERSION}_linux_armv5.tar.gz"
+PACKAGE_FILE="../../../../dist/upload/tar/chirpstack-gateway-bridge_${PACKAGE_VERSION}_linux_armv5.tar.gz"
 DIR=`dirname $0`
 PACKAGE_DIR="${DIR}/package"
 
