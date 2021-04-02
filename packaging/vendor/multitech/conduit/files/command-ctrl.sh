@@ -8,7 +8,6 @@ add_ssh_entry() {
     for DIR in ~root $LOCAL_USER_DIR
     do
         SSH_DIR=$DIR/.ssh
-        echo $SSH_DIR
         if [ ! -f "$SSH_DIR/$SSH_FILE" ] || ! grep -Fxq "$ENTRY" "$SSH_DIR/$SSH_FILE"; then
             mkdir -p $SSH_DIR
             echo "$ENTRY" >> "$SSH_DIR/$SSH_FILE"
