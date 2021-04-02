@@ -16,15 +16,20 @@ log_to_syslog=true
   [commands.commands]
 
     [commands.commands.reboot]
-      command = "/opt/mydevices/command-ctrl.sh reboot"
+      command = "/opt/chirpstack-gateway-bridge/command-ctrl.sh reboot"
       max_execution_duration = "1s"
 
     [commands.commands.remote-ctrl]
-      command = "/opt/mydevices/command-ctrl.sh remote-ctrl"
+      command = "/opt/chirpstack-gateway-bridge/command-ctrl.sh remote-ctrl"
+      max_execution_duration = "15s"
+
+    [commands.commands.remote_ctrl]
+      # Duplicate command for Azure since their command names can not contain hyphens.
+      command = "/opt/chirpstack-gateway-bridge/command-ctrl.sh remote-ctrl"
       max_execution_duration = "15s"
 
     [commands.commands.update]
-      command = "/opt/mydevices/command-ctrl.sh update"
+      command = "/opt/chirpstack-gateway-bridge/command-ctrl.sh update"
       max_execution_duration = "20m"
 
 [integration]
@@ -37,7 +42,14 @@ log_to_syslog=true
 
       [integration.mqtt.auth.azure_iot_hub]
         device_id = "<DEVICE_ID>"
+        model_id = "dtmi:mydevicesinc:multitech:mtcap;1"
         provisioning_endpoint = "global.azure-devices-provisioning.net"
         provisioning_scope = "0ne0006B4D6"
         tls_cert = "<TLS_CERT>"
         tls_key = "<TLS_KEY>"
+
+[meta_data]
+
+  [meta_data.static]
+    make = "Multitech"
+    model = "MTCAP"

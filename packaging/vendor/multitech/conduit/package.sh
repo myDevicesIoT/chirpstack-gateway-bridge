@@ -48,14 +48,13 @@ EOF
 
 # Files
 mkdir -p $PACKAGE_DIR/opt/$PACKAGE_NAME
-mkdir -p $PACKAGE_DIR/opt/mydevices
 mkdir -p $PACKAGE_DIR/etc/opt/$PACKAGE_NAME
 mkdir -p $PACKAGE_DIR/etc/init.d
 
 cp files/$PACKAGE_NAME.toml $PACKAGE_DIR/etc/opt/$PACKAGE_NAME/$PACKAGE_NAME.toml
 cp files/$PACKAGE_NAME.init $PACKAGE_DIR/etc/init.d/$PACKAGE_NAME
-cp files/command-ctrl.sh $PACKAGE_DIR/opt/mydevices/
-chmod 755 $PACKAGE_DIR/opt/mydevices/command-ctrl.sh
+cp files/command-ctrl.sh $PACKAGE_DIR/opt/$PACKAGE_NAME
+chmod 755 $PACKAGE_DIR/opt/$PACKAGE_NAME/command-ctrl.sh
 cp $PACKAGE_FILE $PACKAGE_DIR/opt/$PACKAGE_NAME 
 tar zxf $PACKAGE_DIR/opt/$PACKAGE_NAME/*.tar.gz -C $PACKAGE_DIR/opt/$PACKAGE_NAME
 rm $PACKAGE_DIR/opt/$PACKAGE_NAME/*.tar.gz
