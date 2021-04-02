@@ -53,11 +53,18 @@ type Options struct {
 	Key            string
 	OutputFile     string
 	Protocol       string
+	ModelID        string
+}
+
+// ModelIDPayload represents the payload for a DPS request containing the model ID
+type ModelIDPayload struct {
+	ModelID string `json:"modelId"`
 }
 
 // RegistrationRequest represents the body of a DPS registration request
 type RegistrationRequest struct {
-	RegistrationID string `json:"registrationId"`
+	RegistrationID string      `json:"registrationId"`
+	Payload        interface{} `json:"payload,omitempty"`
 }
 
 // RegistrationState represents the body of a DPS registration response containing the current state of a device
@@ -94,6 +101,7 @@ func NewAzureIoTHubProvisioning(conf config.Config) (*ProvisioningClient, error)
 		RegistrationID: azureConf.DeviceID,
 		Cert:           azureConf.TLSCert,
 		Key:            azureConf.TLSKey,
+		ModelID:        azureConf.ModelID,
 	}
 	if opts.Endpoint == "" || opts.Scope == "" || opts.RegistrationID == "" || opts.Cert == "" || opts.Key == "" {
 		log.WithFields(log.Fields{
@@ -258,9 +266,15 @@ func (c *ProvisioningClient) sendRegisterRequest(delay time.Duration) {
 		time.Sleep(delay)
 	}
 
-	body, err := json.Marshal(RegistrationRequest{
+	request := RegistrationRequest{
 		RegistrationID: c.opts.RegistrationID,
-	})
+	}
+	if c.opts.ModelID != "" {
+		request.Payload = &ModelIDPayload{
+			ModelID: c.opts.ModelID,
+		}
+	}
+	body, err := json.Marshal(request)
 	if err != nil {
 		return
 	}
