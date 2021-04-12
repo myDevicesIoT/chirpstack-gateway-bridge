@@ -3,15 +3,42 @@ DESC="ChirpStack Gateway Bridge"
 DAEMON_BIN=/opt/$NAME/$NAME
 DAEMON_CONF=/etc/$NAME
 DAEMON_PID=/var/run/$NAME.pid
+COMMISSION_DB="/tmp/commissioning.db"
+DEVICE_ID=""
+CONFIG_FILE=/etc/opt/$NAME/$NAME.toml
+CERT_DIR=/var/config/mydevices
+
+obtain_gwid() {
+    for ((i=0; i<60; i++)); do
+        if [ -r "${COMMISSION_DB}" ]; then
+            DEVICE_ID=$(sqlite3 "${COMMISSION_DB}" "SELECT Customer_Gateway_ID FROM Configuration" | tr '[:upper:]' '[:lower:]')
+            return 0
+        fi
+        echo "Commissioning database not available yet"
+        sleep 1
+    done
+
+    return 1
+}
 
 function do_start {
     echo "Starting $NAME"
+    if ! obtain_gwid; then
+        echo "Failed to obtain gateway ID"
+        exit 1
+    fi
+    echo "Device ID $DEVICE_ID"
+    if [[ $DEVICE_ID =~ ^[0-9a-f]{16}$ ]]; then
+        sed -i "s|<DEVICE_ID>|$DEVICE_ID|g" $CONFIG_FILE
+        sed -i "s|<TLS_CERT>|$CERT_DIR/$DEVICE_ID.cert.pem|g" $CONFIG_FILE
+        sed -i "s|<TLS_KEY>|$CERT_DIR/$DEVICE_ID.key.pem|g" $CONFIG_FILE
+    fi    
 	start-stop-daemon \
         --start \
         --background \
         --make-pidfile \
         --pidfile $DAEMON_PID \
-        --exec $DAEMON_BIN
+        --exec $DAEMON_BIN -- --config $CONFIG_FILE
 }
 
 function do_stop {
