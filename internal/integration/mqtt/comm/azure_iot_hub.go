@@ -279,8 +279,8 @@ func (a *AzureIoTHubCommunication) handleCommand(c mqtt.Client, msg mqtt.Message
 	if err := json.Unmarshal(msg.Payload(), &gatewayCommandExecRequest); err != nil {
 		log.WithFields(log.Fields{
 			"topic": msg.Topic(),
-		}).WithError(err).Error("mqtt/comm: unmarshal gateway command execution request error")
-		return
+		}).WithError(err).Debug("mqtt/comm: did not unmarshal gateway command")
+		// return
 	}
 	gatewayCommandExecRequest.GatewayId, _ = hex.DecodeString(a.deviceID)
 	gatewayCommandExecRequest.Command = parts[3]

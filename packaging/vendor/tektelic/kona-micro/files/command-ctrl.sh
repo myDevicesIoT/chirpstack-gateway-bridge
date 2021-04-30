@@ -143,7 +143,7 @@ update() {
 }
 
 reboot_device() {
-    /usr/bin/tektelic_reset
+    /usr/bin/tektelic_reset 1
 }
 
 case "$1" in

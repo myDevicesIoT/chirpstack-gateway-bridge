@@ -17,7 +17,7 @@ log_to_syslog=true
 
     [commands.commands.reboot]
       command = "/opt/chirpstack-gateway-bridge/command-ctrl.sh reboot"
-      max_execution_duration = "1s"
+      max_execution_duration = "1m"
 
     [commands.commands.remote-ctrl]
       command = "/opt/chirpstack-gateway-bridge/command-ctrl.sh remote-ctrl"
