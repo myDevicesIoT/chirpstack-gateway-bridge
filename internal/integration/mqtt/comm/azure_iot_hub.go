@@ -65,7 +65,6 @@ type AzureIoTHubCommunication struct {
 	deviceID        string
 	commandTopic    string
 	twinRequestID   string
-	commandID       string
 	twin            DigitalTwin
 	commandChan     chan<- gw.GatewayCommandExecRequest
 	fallbackHandler mqtt.MessageHandler
@@ -192,9 +191,9 @@ func (a *AzureIoTHubCommunication) publishMethodsResponse(execResponse *gw.Gatew
 	}
 	log.WithField("response", response).Debug("mqtt/comm: decoded exec response")
 	if response.Error != "" {
-		statusCode = 500
+		statusCode = 400
 	}
-	topic := fmt.Sprintf(methodsResponseTopic, statusCode, a.commandID)
+	topic := fmt.Sprintf(methodsResponseTopic, statusCode, string(execResponse.ExecId))
 	payload, err := json.Marshal(response)
 	if err != nil {
 		return err
@@ -273,7 +272,6 @@ func (a *AzureIoTHubCommunication) handleCommand(c mqtt.Client, msg mqtt.Message
 
 	parts := strings.SplitN(msg.Topic(), "/", 5)
 	params, _ := a.parseTopic(msg)
-	a.commandID = params["$rid"][0]
 
 	var gatewayCommandExecRequest gw.GatewayCommandExecRequest
 	if err := json.Unmarshal(msg.Payload(), &gatewayCommandExecRequest); err != nil {
