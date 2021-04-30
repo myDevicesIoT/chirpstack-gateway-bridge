@@ -38,11 +38,6 @@ cat > $PACKAGE_DIR/CONTROL/prerm << EOF
 EOF
 chmod 755 $PACKAGE_DIR/CONTROL/prerm
 
-cat > $PACKAGE_DIR/CONTROL/postrm << EOF
-update-rc.d chirpstack-gateway-bridge remove -f
-EOF
-chmod 755 $PACKAGE_DIR/CONTROL/postrm
-
 cat > $PACKAGE_DIR/CONTROL/conffiles << EOF
 /etc/opt/$PACKAGE_NAME/$PACKAGE_NAME.toml
 EOF
