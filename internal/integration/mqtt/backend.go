@@ -202,11 +202,6 @@ func (b *Backend) Start() error {
 	b.connectLoop()
 	go b.reconnectLoop()
 	go b.subscribeLoop()
-
-	if b.comm != nil {
-		b.comm.Start()
-	}
-
 	return nil
 }
 
@@ -471,6 +466,10 @@ func (b *Backend) onConnected(c paho.Client) {
 	// onConnectionLost function, the function could block until the connection
 	// is restored because the (un)subscribe operations will block until then.
 	b.gatewaysSubscribed = make(map[lorawan.EUI64]struct{})
+
+	if b.comm != nil {
+		b.comm.Start()
+	}
 }
 
 func (b *Backend) subscribeLoop() {
