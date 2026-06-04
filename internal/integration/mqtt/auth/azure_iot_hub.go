@@ -13,6 +13,7 @@ import (
 
 	mqtt "github.com/eclipse/paho.mqtt.golang"
 	"github.com/pkg/errors"
+	log "github.com/sirupsen/logrus"
 
 	"github.com/brocaar/chirpstack-gateway-bridge/internal/config"
 	"github.com/brocaar/lorawan"
@@ -203,9 +204,26 @@ func (a *AzureIoTHubAuthentication) Init(opts *mqtt.ClientOptions) error {
 }
 
 // GetGatewayID returns the GatewayID if available.
-// TODO: implement.
+//
+// The Azure IoT Hub device id is expected to be the gateway EUI64. When it
+// decodes to a valid EUI64, it is returned so that the integration can set up
+// a static command subscription at connect time (independent of the gateway's
+// backend / UDP liveness).
 func (a *AzureIoTHubAuthentication) GetGatewayID() *lorawan.EUI64 {
-	return nil
+	if a.clientID == "" {
+		return nil
+	}
+
+	// Try to decode the device id as gateway id.
+	var gatewayID lorawan.EUI64
+	if err := gatewayID.UnmarshalText([]byte(a.clientID)); err != nil {
+		log.WithError(err).WithFields(log.Fields{
+			"device_id": a.clientID,
+		}).Warning("integration/mqtt/auth: could not decode Azure device id to gateway id")
+		return nil
+	}
+
+	return &gatewayID
 }
 
 // Update updates the authentication options.
