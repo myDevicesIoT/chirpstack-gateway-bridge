@@ -16,4 +16,4 @@ jobs:
         uses: actions/checkout@v4
       -
         name: Run tests
-        run: docker-compose run --rm chirpstack-gateway-bridge make test
+        run: docker compose run --rm chirpstack-gateway-bridge make test
