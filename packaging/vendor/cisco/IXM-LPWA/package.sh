@@ -6,7 +6,7 @@ PACKAGE_NAME="chirpstack-gateway-bridge"
 PACKAGE_VERSION=$1
 REV="r1"
 
-PACKAGE_URL="https://artifacts.chirpstack.io/downloads/chirpstack-gateway-bridge/chirpstack-gateway-bridge_${PACKAGE_VERSION}_linux_armv5.tar.gz"
+BUILD_ARCH="armv5"   # cross-compile label produced by packaging/build-binaries.sh
 DIR=`dirname $0`
 FILES_DIR="${DIR}/files"
 KEY_DIR="${DIR}/key"
@@ -31,10 +31,15 @@ mkdir -p $TMP_DIR/package
 cp -R $FILES_DIR/* $PACKAGE_DIR
 
 # ChirpStack Gateway Bridge binary
+# This fork bundles the locally cross-compiled binary instead of the upstream
+# release. Run packaging/build-binaries.sh first to produce build/${BUILD_ARCH}/.
 mkdir -p $PACKAGE_DIR/opt/$PACKAGE_NAME
-wget -P $PACKAGE_DIR/opt/$PACKAGE_NAME $PACKAGE_URL
-tar zxf $PACKAGE_DIR/opt/$PACKAGE_NAME/*.tar.gz -C $PACKAGE_DIR/opt/$PACKAGE_NAME
-rm $PACKAGE_DIR/opt/$PACKAGE_NAME/*.tar.gz
+BINARY="${DIR}/../../../../build/${BUILD_ARCH}/${PACKAGE_NAME}"
+if [ ! -f "$BINARY" ]; then
+	echo "error: ${BINARY} not found; run packaging/build-binaries.sh ${PACKAGE_VERSION} first" >&2
+	exit 1
+fi
+cp "$BINARY" $PACKAGE_DIR/opt/$PACKAGE_NAME/$PACKAGE_NAME
 
 echo "Tarring"
 tar cvfz $TMP_DIR/files.pkg.tar.gz -C $PACKAGE_DIR .
